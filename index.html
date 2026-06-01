@@ -37,9 +37,6 @@
     <section class="panel glass" data-panel="model" style="left:24px; top:88px;">
       <div class="panel-head"><span class="panel-title">📦 模型 / 导入</span><button class="panel-close" data-close>✕</button></div>
       <div class="panel-body">
-        <div class="field-label">内置预设</div>
-        <div class="preset-grid" id="model-presets"></div>
-        <div class="divider"></div>
         <div class="field-label">导入本地模型（支持多种格式）</div>
         <div class="btn-row">
           <button class="btn" id="import-folder">📁 模型文件夹</button>
@@ -50,6 +47,9 @@
           <button class="btn ghost" id="import-bg">🖼️ 背景图片</button>
         </div>
         <p class="hint">喵帕斯</p>
+        <div class="divider"></div>
+        <div class="lh-head"><span class="field-label">导入历史</span><button class="mini-btn" id="history-clear">清空</button></div>
+        <div class="history-list" id="import-history"><span class="empty">暂无导入记录</span></div>
         <div class="divider"></div>
         <div class="kv"><span>名称</span><b id="info-name">—</b></div>
         <div class="kv"><span>格式</span><b id="info-format">—</b></div>

@@ -5,16 +5,17 @@ import { Scene3D } from './scene.js';
 import { Viewer } from './viewer.js';
 import { FilterController } from './filters.js';
 import { AudioPlayer } from './audio.js';
-import { importModel, importLpkFiles, importLpkFromUrl } from './importer.js';
-import { MODEL_PRESETS, BG_PRESETS, bgSwatch } from './presets.js';
+import { importModel, importLpkFiles } from './importer.js';
+import { BG_PRESETS, bgSwatch } from './presets.js';
 
 const $ = id => document.getElementById(id);
 const PREFS_KEY = 'l2d.prefs';
+const HISTORY_KEY = 'l2d.history';
 
 const app = {
   ui: null, scene: null, viewer: null, filters: null, audio: null,
-  currentUrls: [], activeModelId: null, bgState: { blur: 0, bright: 100 },
-  prefs: {},
+  currentUrls: [], bgState: { blur: 0, bright: 100 },
+  prefs: {}, history: [],
 };
 
 /* ----------------------------- prefs ----------------------------- */
@@ -29,7 +30,7 @@ function showLoading(text) { const l = $('loading'); if (l) { l.querySelector('.
 function hideLoading() { $('loading')?.classList.add('hide'); }
 
 /* ----------------------------- model loading ----------------------------- */
-async function loadTarget(target, modelId) {
+async function loadTarget(target) {
   showLoading(`正在加载：${target.name || '模型'}`);
   const old = app.currentUrls;
   app.currentUrls = target.objectUrls || [];
@@ -38,12 +39,11 @@ async function loadTarget(target, modelId) {
   } catch (e) {
     app.ui.toast('模型加载失败：' + (e.message || e));
     hideLoading();
-    return;
+    return false;
   }
   // revoke previous model's blob URLs
   for (const u of old) { try { URL.revokeObjectURL(u); } catch {} }
 
-  app.activeModelId = modelId || null;
   setText('info-name', target.name || '—');
   setText('info-format', target.format || '—');
   setText('brand-model', target.name || '已加载模型');
@@ -51,32 +51,65 @@ async function loadTarget(target, modelId) {
   setText('info-counts', `${acts.expressions.length} 表情 / ${acts.motions.length} 动作组`);
   buildActions(acts);
   syncTuneUI();
-  markActiveModel(modelId);
-  if (modelId) setPref('lastModel', modelId);
   app.ui.toast('已加载：' + (target.name || '模型'));
   hideLoading();
+  return true;
 }
 
-async function loadPreset(p) {
+/* ----------------------------- import history ----------------------------- */
+const escapeHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function fmtAgo(t) {
+  const d = Date.now() - t;
+  if (d < 60000) return '刚刚';
+  if (d < 3600000) return Math.floor(d / 60000) + ' 分钟前';
+  const dt = new Date(t), p = n => String(n).padStart(2, '0');
+  if (d < 86400000) return `${p(dt.getHours())}:${p(dt.getMinutes())}`;
+  return `${dt.getMonth() + 1}/${dt.getDate()}`;
+}
+function loadHistory() { try { app.history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { app.history = []; } }
+function persistHistory() {
   try {
-    if (p.kind === 'url') {
-      let rawJson = null;
-      try { rawJson = await (await fetch(p.url)).json(); } catch (e) { log.warn('无法预取模型 JSON', e); }
-      await loadTarget({ source: p.url, rawJson, name: p.name, format: p.format }, p.id);
-    } else if (p.kind === 'lpk') {
-      showLoading('正在本地解密 .lpk …');
-      const target = await importLpkFromUrl(p.lpkUrl, p.configUrl, p.name);
-      await loadTarget(target, p.id);
-    }
-  } catch (e) {
-    log.error('预设加载失败', e);
-    app.ui.toast('预设加载失败：' + (e.message || e));
-    hideLoading();
+    const meta = app.history.map(({ id, name, format, kind, time }) => ({ id, name, format, kind, time }));
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(meta));
+  } catch {}
+}
+function recordHistory({ name, format, kind, entries }) {
+  const id = `${name}|${format}`;
+  app.history = app.history.filter(h => h.id !== id);
+  app.history.unshift({ id, name, format, kind, time: Date.now(), entries });   // entries kept in-memory only
+  if (app.history.length > 12) app.history = app.history.slice(0, 12);
+  persistHistory();
+  renderHistory();
+}
+function removeHistory(id) { app.history = app.history.filter(h => h.id !== id); persistHistory(); renderHistory(); }
+function clearHistory() { app.history = []; persistHistory(); renderHistory(); app.ui.toast('已清空导入历史'); }
+function reloadHistory(id) {
+  const h = app.history.find(e => e.id === id);
+  if (!h) return;
+  if (h.entries) {                                   // same session: reload instantly
+    h.kind === 'lpk' ? doImportLpk(h.entries) : doImportModel(h.entries, h.kind);
+  } else {                                           // restored from a past session: re-pick files
+    app.ui.toast('该记录来自既往会话，请重新选择对应文件');
+    if (h.kind === 'lpk') $('import-lpk').click();
+    else if (h.kind === 'folder') $('import-folder').click();
+    else $('import-files').click();
   }
 }
-
-function markActiveModel(id) {
-  document.querySelectorAll('#model-presets .preset').forEach(el => el.classList.toggle('active', el.dataset.mid === id));
+function renderHistory() {
+  const c = $('import-history'); if (!c) return;
+  c.innerHTML = '';
+  if (!app.history.length) { c.innerHTML = '<span class="empty">暂无导入记录</span>'; return; }
+  const ico = k => k === 'lpk' ? '🔓' : k === 'folder' ? '📁' : '🗂️';
+  for (const h of app.history) {
+    const row = document.createElement('div');
+    row.className = 'history-item' + (h.entries ? '' : ' stale');
+    row.innerHTML = `<span class="hi-ico">${ico(h.kind)}</span>` +
+      `<span class="hi-main"><b>${escapeHtml(h.name)}</b><small>${escapeHtml(h.format)} · ${fmtAgo(h.time)}${h.entries ? '' : ' · 需重新选择'}</small></span>` +
+      `<button class="hi-del" title="移除">✕</button>`;
+    row.addEventListener('click', () => reloadHistory(h.id));
+    row.querySelector('.hi-del').addEventListener('click', e => { e.stopPropagation(); removeHistory(h.id); });
+    c.appendChild(row);
+  }
 }
 
 /* ----------------------------- actions UI ----------------------------- */
@@ -212,24 +245,26 @@ function entriesFromInput(fileList, useRelative) {
   return Array.from(fileList || []).map(f => ({ file: f, path: (useRelative && f.webkitRelativePath) ? f.webkitRelativePath : f.name }));
 }
 
-async function doImportModel(entries) {
+async function doImportModel(entries, kind = 'files') {
   if (!entries.length) return;
   showLoading('正在导入本地模型…');
+  let target;
   try {
-    const target = await importModel(entries);
-    await loadTarget(target, null);
+    target = await importModel(entries);
   } catch (e) {
-    log.error('导入失败', e); app.ui.toast('导入失败：' + (e.message || e)); hideLoading();
+    log.error('导入失败', e); app.ui.toast('导入失败：' + (e.message || e)); hideLoading(); return;
   }
+  if (await loadTarget(target)) recordHistory({ name: target.name, format: target.format, kind, entries });
 }
 async function doImportLpk(entries) {
   showLoading('正在本地解密 .lpk …');
+  let target;
   try {
-    const target = await importLpkFiles(entries);
-    await loadTarget(target, null);
+    target = await importLpkFiles(entries);
   } catch (e) {
-    log.error('lpk 导入失败', e); app.ui.toast('lpk 导入失败：' + (e.message || e)); hideLoading();
+    log.error('lpk 导入失败', e); app.ui.toast('lpk 导入失败：' + (e.message || e)); hideLoading(); return;
   }
+  if (await loadTarget(target)) recordHistory({ name: target.name, format: target.format, kind: 'lpk', entries });
 }
 function wireImport() {
   // .lpk import is two steps: choose the .lpk, then its config.json separately
@@ -246,8 +281,8 @@ function wireImport() {
   $('import-files')?.addEventListener('click', () => $('file-files').click());
   $('import-lpk')?.addEventListener('click', () => { pendingLpk = null; const i = $('file-lpk'); i.value = ''; i.click(); });
   $('import-bg')?.addEventListener('click', () => $('file-bg').click());
-  $('file-folder')?.addEventListener('change', e => doImportModel(entriesFromInput(e.target.files, true)));
-  $('file-files')?.addEventListener('change', e => doImportModel(entriesFromInput(e.target.files, false)));
+  $('file-folder')?.addEventListener('change', e => doImportModel(entriesFromInput(e.target.files, true), 'folder'));
+  $('file-files')?.addEventListener('change', e => doImportModel(entriesFromInput(e.target.files, false), 'files'));
   // step 1: pick the .lpk -> then pop a second dialog for config.json
   $('file-lpk')?.addEventListener('change', e => {
     const f = e.target.files[0]; if (!f) return;
@@ -269,7 +304,6 @@ function wireImport() {
     app.currentUrls = [];
     setText('info-name', '—'); setText('info-format', '—'); setText('info-counts', '—'); setText('brand-model', '未加载模型');
     buildActions({ expressions: [], motions: [] });
-    markActiveModel(null);
     app.ui.toast('模型已移除');
   });
 }
@@ -435,16 +469,10 @@ async function init() {
   app.filters = new FilterController($('stage'), state => setPref('filter', state));
   app.filters.mount();
 
-  // model presets grid
-  const grid = $('model-presets');
-  for (const p of MODEL_PRESETS) {
-    const el = document.createElement('button');
-    el.className = 'preset'; el.dataset.mid = p.id;
-    el.style.background = 'linear-gradient(135deg, rgba(124,199,255,.45), rgba(200,155,255,.45))';
-    el.innerHTML = `<span class="pico">${p.pico}</span><span class="preset-label"><b>${p.name}</b><small>${p.sub}</small></span>`;
-    el.addEventListener('click', () => loadPreset(p));
-    grid.appendChild(el);
-  }
+  // import history
+  loadHistory();
+  renderHistory();
+  $('history-clear')?.addEventListener('click', clearHistory);
 
   wireTune(); wireBackground(); wireWeather(); wireImport(); wireDragDrop(); wireSettings(); wireMusic();
   applyPrefs();
@@ -452,11 +480,8 @@ async function init() {
 
   hideLoading();
   log.ok('界面就绪');
-
-  // initial model
-  const lastId = app.prefs.lastModel || 'a';
-  const preset = MODEL_PRESETS.find(p => p.id === lastId) || MODEL_PRESETS[0];
-  loadPreset(preset);
+  app.ui.open('model');
+  app.ui.toast('请导入 Live2D 模型（文件夹 / 多文件 / .lpk）');
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

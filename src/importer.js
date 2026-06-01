@@ -124,14 +124,4 @@ export async function importLpkFiles(entries) {
   return { source: buildSettings(json), rawJson: json, name, format, objectUrls };
 }
 
-/** Fetch a built-in .lpk preset from the server and decrypt it in-browser. */
-export async function importLpkFromUrl(lpkUrl, configUrl, name) {
-  const [buf, cfg] = await Promise.all([
-    fetch(lpkUrl).then(r => { if (!r.ok) throw new Error('无法读取 ' + lpkUrl); return r.arrayBuffer(); }),
-    configUrl ? fetch(configUrl).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
-  ]);
-  const res = await loadLpk(buf, cfg);
-  return { source: buildSettings(res.json), rawJson: res.json, name: name || res.name, format: res.format, objectUrls: res.objectUrls };
-}
-
 export function imageURL(file) { return URL.createObjectURL(file); }

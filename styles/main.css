@@ -187,6 +187,22 @@ input[type=range]::-moz-range-thumb{ width:16px; height:16px; border:none; borde
 .preset-label b{ font-weight:650; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .preset-label small{ font-weight:400; font-size:9.5px; opacity:.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
+/* import history */
+.lh-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.history-list{ display:flex; flex-direction:column; gap:6px; max-height:230px; overflow-y:auto; }
+.history-list .empty{ font-size:12px; color:var(--txt-faint); padding:4px 2px; }
+.history-item{ display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:11px; cursor:pointer;
+  background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.09); transition:background .2s, transform .15s var(--ease); }
+.history-item:hover{ background:rgba(255,255,255,.15); transform:translateX(2px); }
+.history-item.stale{ opacity:.6; }
+.history-item .hi-ico{ font-size:16px; flex:none; }
+.history-item .hi-main{ display:flex; flex-direction:column; min-width:0; flex:1; line-height:1.25; }
+.history-item .hi-main b{ font-weight:600; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.history-item .hi-main small{ font-size:10px; color:var(--txt-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.history-item .hi-del{ flex:none; width:22px; height:22px; border:none; border-radius:50%; cursor:pointer; font-size:11px;
+  background:rgba(255,255,255,.1); color:var(--txt); transition:background .2s; }
+.history-item .hi-del:hover{ background:var(--danger); }
+
 /* segmented */
 .seg{ display:flex; gap:4px; background:rgba(0,0,0,.26); padding:4px; border-radius:13px; }
 .seg button{ flex:1; border:none; background:transparent; color:var(--txt-dim); padding:8px 4px; border-radius:9px; font-size:12px; cursor:pointer; transition:background .2s,color .2s; }

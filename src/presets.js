@@ -1,11 +1,5 @@
 // presets.js — built-in models, background skies, and filter looks.
 
-export const MODEL_PRESETS = [
-  { id: 'a', name: '特莉波卡', sub: 'Cubism 4 · 文件夹', kind: 'url', url: 'assets/models/a/model0.json', format: 'Cubism 4 · moc3', pico: '🅰️' },
-  { id: 'b', name: '特莉波卡', sub: 'Cubism 4 · 解包', kind: 'url', url: 'assets/models/b/model0.json', format: 'Cubism 4 · moc3', pico: '🅱️' },
-  { id: 'b-lpk', name: '特莉波卡', sub: '.lpk · 实时解密', kind: 'lpk', lpkUrl: 'b/3376576902.lpk', configUrl: 'b/config.json', format: 'LPK · Cubism', pico: '🔓' },
-];
-
 export const BG_PRESETS = [
   { id: 'day', name: '晴空', pico: '☀️', top: '#4a90e2', mid: '#7fb8f0', bottom: '#cdeaff', celestial: 'sun', stars: false },
   { id: 'sunset', name: '黄昏', pico: '🌇', top: '#ff9a56', mid: '#ff5e7e', bottom: '#7a3b8f', celestial: 'sun', stars: false },
