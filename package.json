@@ -1,0 +1,11 @@
+{
+  "name": "live2d-web-viewer",
+  "version": "1.0.0",
+  "description": "液态玻璃风 Live2D Web Viewer —— three.js 背景特效 + pixi-live2d-display 渲染，支持多格式导入、动作快捷键、天气滤镜、本地音乐口型同步、控制台日志。",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "python serve.py",
+    "check": "node --check src/main.js"
+  }
+}

@@ -1,0 +1,15 @@
+# Dev tooling / not part of the deployed static site
+LpkUnpacker/
+.claude/
+__pycache__/
+*.pyc
+node_modules/
+
+# Test artifacts
+tools/server.log
+tools/*.png
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

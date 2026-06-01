@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Live2D Web Viewer · 液态玻璃</title>
+<link rel="preconnect" href="data:," />
+<link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+  <!-- ===== Render stage: three.js background + pixi live2d (filters applied here) ===== -->
+  <div id="stage" class="stage">
+    <canvas id="bg-canvas"></canvas>
+    <canvas id="live2d-canvas"></canvas>
+    <div id="filter-vignette" class="vignette" aria-hidden="true"></div>
+  </div>
+
+  <!-- ===== Top bar ===== -->
+  <header id="topbar" class="topbar glass">
+    <div class="brand">
+      <span class="brand-logo">🎐</span>
+      <div class="brand-text">
+        <strong>Live2D Web Viewer</strong>
+        <small id="brand-model">未加载模型</small>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="chip" id="btn-fps" title="性能">— FPS</button>
+      <button class="chip" id="btn-fullscreen" title="全屏">⛶ 全屏</button>
+    </div>
+  </header>
+
+  <!-- ===== Floating glass panels ===== -->
+  <main id="panels" class="panels">
+
+    <!-- Model panel -->
+    <section class="panel glass" data-panel="model" style="left:24px; top:88px;">
+      <div class="panel-head"><span class="panel-title">📦 模型 / 导入</span><button class="panel-close" data-close>✕</button></div>
+      <div class="panel-body">
+        <div class="field-label">内置预设</div>
+        <div class="preset-grid" id="model-presets"></div>
+        <div class="divider"></div>
+        <div class="field-label">导入本地模型（支持多种格式）</div>
+        <div class="btn-row">
+          <button class="btn" id="import-folder">📁 模型文件夹</button>
+          <button class="btn" id="import-files">🗂️ 多个文件</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="import-lpk">🔓 .lpk 加密包</button>
+          <button class="btn ghost" id="import-bg">🖼️ 背景图片</button>
+        </div>
+        <p class="hint">喵帕斯</p>
+        <div class="divider"></div>
+        <div class="kv"><span>名称</span><b id="info-name">—</b></div>
+        <div class="kv"><span>格式</span><b id="info-format">—</b></div>
+        <div class="kv"><span>表情 / 动作</span><b id="info-counts">—</b></div>
+        <button class="btn danger block" id="btn-clear-model">移除模型</button>
+        <!-- hidden inputs -->
+        <input type="file" id="file-folder" webkitdirectory directory multiple hidden />
+        <input type="file" id="file-files" multiple hidden />
+        <input type="file" id="file-lpk" accept=".lpk,.zip" hidden />
+        <input type="file" id="file-lpk-config" accept=".json,application/json" hidden />
+        <input type="file" id="file-bg" accept="image/*" hidden />
+      </div>
+    </section>
+
+    <!-- Actions panel -->
+    <section class="panel glass" data-panel="actions" style="left:24px; top:118px; display:none;">
+      <div class="panel-head"><span class="panel-title">🎭 动作快捷键</span><button class="panel-close" data-close>✕</button></div>
+      <div class="panel-body">
+        <div class="field-label">表情</div>
+        <div class="chip-wrap" id="action-expressions"><span class="empty">加载模型后显示</span></div>
+        <div class="divider"></div>
+        <div class="field-label">动作 Motion</div>
+        <div class="chip-wrap" id="action-motions"><span class="empty">该模型无独立动作</span></div>
+        <div class="divider"></div>
+        <div class="btn-row">
+          <button class="btn" id="act-random">🎲 随机</button>
+          <button class="btn ghost" id="act-reset-expr">↺ 恢复表情</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Fine-tune panel -->
+    <section class="panel glass" data-panel="tune" style="right:24px; top:88px; display:none;">
+      <div class="panel-head"><span class="panel-title">🎚️ 模型微调</span><button class="panel-close" data-close>✕</button></div>
+      <div class="panel-body">
+        <div class="slider"><label>水平位置 X<span data-val="tune-x">0</span></label><input type="range" id="tune-x" min="-1" max="1" step="0.005" value="0" /></div>
+        <div class="slider"><label>垂直位置 Y<span data-val="tune-y">0</span></label><input type="range" id="tune-y" min="-1" max="1" step="0.005" value="0" /></div>
+        <div class="slider"><label>缩放<span data-val="tune-scale">100%</span></label><input type="range" id="tune-scale" min="10" max="320" step="1" value="100" /></div>
+        <div class="slider"><label>旋转<span data-val="tune-rot">0°</span></label><input type="range" id="tune-rot" min="-180" max="180" step="1" value="0" /></div>
+        <div class="slider"><label>不透明度<span data-val="tune-alpha">100%</span></label><input type="range" id="tune-alpha" min="0" max="100" step="1" value="100" /></div>
+        <div class="divider"></div>
+        <label class="switch"><input type="checkbox" id="tune-track" checked /><span>鼠标视线跟随</span></label>
+        <label class="switch"><input type="checkbox" id="tune-breath" checked /><span>呼吸 / 自动眨眼</span></label>
+        <label class="switch"><input type="checkbox" id="tune-idle" /><span>点击播放随机动作</span></label>
+        <div class="btn-row">
+          <button class="btn" id="tune-fit">↳ 自适应居中</button>
+          <button class="btn ghost" id="tune-reset">↺ 重置</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Background panel -->
+    <section class="panel glass" data-panel="bg" style="left:24px; top:148px; display:none;">
+      <div class="panel-head"><span class="panel-title">🌅 背景</span><button class="panel-close" data-close>✕</button></div>
+      <div class="panel-body">
+        <div class="field-label">预设场景</div>
+        <div class="preset-grid bg-grid" id="bg-presets"></div>
+        <div class="divider"></div>
+        <div class="field-label">自定义渐变</div>
+        <div class="btn-row tight">
+          <label class="color"><input type="color" id="bg-c1" value="#8ec5fc" />顶部</label>
+          <label class="color"><input type="color" id="bg-c2" value="#e0c3fc" />底部</label>
+          <button class="btn ghost" id="bg-apply-grad">应用</button>
+        </div>
+        <div class="slider"><label>背景虚化<span data-val="bg-blur">0</span></label><input type="range" id="bg-blur" min="0" max="30" step="1" value="0" /></div>
+        <div class="slider"><label>背景亮度<span data-val="bg-bright">100%</span></label><input type="range" id="bg-bright" min="20" max="160" step="1" value="100" /></div>
+        <label class="switch"><input type="checkbox" id="bg-celestial" checked /><span>日月 / 星辰装饰</span></label>
+        <label class="switch"><input type="checkbox" id="bg-parallax" checked /><span>视差浮动</span></label>
+      </div>
+    </section>
+
+    <!-- Weather panel -->
+    <section class="panel glass" data-panel="weather" style="left:340px; top:148px; display:none;">
+      <div class="panel-head"><span class="panel-title">❄️ 天气特效</span><button class="panel-close" data-close>✕</button></div>
+      <div class="panel-body">
+        <div class="seg" id="weather-seg">
+          <button data-w="none" class="active">无</button>
+          <button data-w="rain">🌧️ 雨</button>
+          <button data-w="snow">❄️ 雪</button>
+          <button data-w="sakura">🌸 樱花</button>
+        </div>
+        <div class="slider"><label>密度<span data-val="w-amount">中</span></label><input type="range" id="w-amount" min="100" max="3000" step="50" value="900" /></div>
+        <div class="slider"><label>速度<span data-val="w-speed">1.0×</span></label><input type="range" id="w-speed" min="20" max="300" step="5" value="100" /></div>
+        <div class="slider"><label>风力<span data-val="w-wind">0</span></label><input type="range" id="w-wind" min="-100" max="100" step="1" value="20" /></div>
+        <div class="slider"><label>粒子大小<span data-val="w-size">1.0×</span></label><input type="range" id="w-size" min="30" max="260" step="5" value="100" /></div>
+        <label class="switch"><input type="checkbox" id="w-fog" /><span>地面雾气</span></label>
+      </div>
+    </section>
+
+    <!-- Filters panel -->
+    <section class="panel glass" data-panel="filter" style="right:24px; top:118px; display:none;">
+      <div class="panel-head"><span class="panel-title">🎨 滤镜</span><button class="panel-close" data-close>✕</button></div>
+      <div class="panel-body">
+        <div class="field-label">内置滤镜</div>
+        <div class="chip-wrap" id="filter-presets"></div>
+        <div class="divider"></div>
+        <div class="field-label">手动调节</div>
+        <div class="slider"><label>亮度<span data-val="f-bright">100%</span></label><input type="range" id="f-bright" min="0" max="200" value="100" /></div>
+        <div class="slider"><label>对比度<span data-val="f-contrast">100%</span></label><input type="range" id="f-contrast" min="0" max="200" value="100" /></div>
+        <div class="slider"><label>饱和度<span data-val="f-sat">100%</span></label><input type="range" id="f-sat" min="0" max="300" value="100" /></div>
+        <div class="slider"><label>色相<span data-val="f-hue">0°</span></label><input type="range" id="f-hue" min="0" max="360" value="0" /></div>
+        <div class="slider"><label>模糊<span data-val="f-blur">0</span></label><input type="range" id="f-blur" min="0" max="20" value="0" /></div>
+        <div class="slider"><label>怀旧<span data-val="f-sepia">0%</span></label><input type="range" id="f-sepia" min="0" max="100" value="0" /></div>
+        <div class="slider"><label>黑白<span data-val="f-gray">0%</span></label><input type="range" id="f-gray" min="0" max="100" value="0" /></div>
+        <button class="btn ghost block" id="f-reset">↺ 清除滤镜</button>
+      </div>
+    </section>
+
+    <!-- Music panel -->
+    <section class="panel glass" data-panel="music" style="right:24px; top:148px; display:none;">
+      <div class="panel-head"><span class="panel-title">🎵 本地音乐</span><button class="panel-close" data-close>✕</button></div>
+      <div class="panel-body">
+        <button class="btn block" id="music-pick">📂 选择本地音乐</button>
+        <div class="track" id="music-track">未选择曲目</div>
+        <canvas id="music-viz" class="viz" width="320" height="64"></canvas>
+        <div class="player">
+          <button class="round" id="music-prev">⏮</button>
+          <button class="round big" id="music-play">▶</button>
+          <button class="round" id="music-next">⏭</button>
+        </div>
+        <div class="slider"><label>进度<span data-val="music-time">00:00</span></label><input type="range" id="music-seek" min="0" max="1000" value="0" /></div>
+        <div class="slider"><label>音量<span data-val="music-vol">80%</span></label><input type="range" id="music-vol" min="0" max="100" value="80" /></div>
+        <label class="switch"><input type="checkbox" id="music-lipsync" checked /><span>口型同步（嘴随节奏动）</span></label>
+        <label class="switch"><input type="checkbox" id="music-loop" /><span>循环播放</span></label>
+        <input type="file" id="file-music" accept="audio/*" multiple hidden />
+      </div>
+    </section>
+
+    <!-- Console panel -->
+    <section class="panel glass wide" data-panel="console" style="left:50%; top:auto; bottom:108px; transform:translateX(-50%); display:none;">
+      <div class="panel-head"><span class="panel-title">🖥️ 控制台 / 日志</span>
+        <div class="head-tools">
+          <select id="log-level" class="mini-select">
+            <option value="all">全部</option>
+            <option value="info">信息+</option>
+            <option value="warn">警告+</option>
+            <option value="error">错误</option>
+          </select>
+          <button class="mini-btn" id="log-autoscroll" data-on="1">⤓ 自动</button>
+          <button class="mini-btn" id="log-copy">⧉ 复制</button>
+          <button class="mini-btn" id="log-clear">🗑 清空</button>
+          <button class="panel-close" data-close>✕</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="log-output" class="log-output"></div>
+      </div>
+    </section>
+
+    <!-- Settings panel -->
+    <section class="panel glass" data-panel="settings" style="right:24px; top:178px; display:none;">
+      <div class="panel-head"><span class="panel-title">⚙️ 设置</span><button class="panel-close" data-close>✕</button></div>
+      <div class="panel-body">
+        <div class="kv"><span>渲染质量</span>
+          <select id="set-quality" class="mini-select">
+            <option value="auto">自动</option>
+            <option value="low">流畅</option>
+            <option value="high" selected>高清</option>
+            <option value="ultra">极致(2x)</option>
+          </select>
+        </div>
+        <label class="switch"><input type="checkbox" id="set-aa" checked /><span>抗锯齿</span></label>
+        <label class="switch"><input type="checkbox" id="set-showfps" checked /><span>显示 FPS</span></label>
+        <label class="switch"><input type="checkbox" id="set-glass" checked /><span>液态玻璃毛玻璃效果</span></label>
+        <div class="divider"></div>
+        <button class="btn ghost block" id="set-reset-layout">重置面板布局</button>
+        <button class="btn ghost block" id="set-screenshot">📸 截图当前画面</button>
+        <p class="hint">所有设置与布局自动保存在本地浏览器。</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== Bottom dock (macOS style) ===== -->
+  <nav id="dock" class="dock glass">
+    <button class="dock-item" data-toggle="model" title="模型/导入"><span>📦</span><i>模型</i></button>
+    <button class="dock-item" data-toggle="actions" title="动作快捷键"><span>🎭</span><i>动作</i></button>
+    <button class="dock-item" data-toggle="tune" title="模型微调"><span>🎚️</span><i>微调</i></button>
+    <span class="dock-sep"></span>
+    <button class="dock-item" data-toggle="bg" title="背景"><span>🌅</span><i>背景</i></button>
+    <button class="dock-item" data-toggle="weather" title="天气特效"><span>❄️</span><i>天气</i></button>
+    <button class="dock-item" data-toggle="filter" title="滤镜"><span>🎨</span><i>滤镜</i></button>
+    <span class="dock-sep"></span>
+    <button class="dock-item" data-toggle="music" title="本地音乐"><span>🎵</span><i>音乐</i></button>
+    <button class="dock-item" data-toggle="console" title="控制台"><span>🖥️</span><i>控制台</i></button>
+    <button class="dock-item" data-toggle="settings" title="设置"><span>⚙️</span><i>设置</i></button>
+  </nav>
+
+  <!-- ===== Overlays ===== -->
+  <div id="drop-overlay" class="drop-overlay"><div class="drop-card glass"><div class="drop-ico">⬇️</div><div>松开以导入模型 / 背景 / .lpk</div></div></div>
+  <div id="toast" class="toast"></div>
+  <div id="loading" class="loading"><div class="spinner"></div><div class="loading-text">正在初始化渲染引擎…</div></div>
+
+  <!-- ===== Libraries (UMD globals), order matters ===== -->
+  <script src="vendor/three.min.js"></script>
+  <script src="vendor/live2dcubismcore.min.js"></script>
+  <script src="vendor/live2d.min.js"></script>
+  <script src="vendor/pixi.min.js"></script>
+  <script>window.PIXI = PIXI;</script>
+  <script src="vendor/pixi-live2d-display.min.js"></script>
+  <script src="vendor/jszip.min.js"></script>
+
+  <!-- App (ES modules) -->
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
