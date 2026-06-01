@@ -189,11 +189,17 @@ input[type=range]::-moz-range-thumb{ width:16px; height:16px; border:none; borde
 
 /* import history */
 .lh-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.history-list{ display:flex; flex-direction:column; gap:6px; max-height:230px; overflow-y:auto; }
+.history-list{ display:flex; flex-direction:column; gap:6px; max-height:228px;
+  overflow-y:auto; overflow-x:hidden; padding-right:3px;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.22) transparent; }
+.history-list::-webkit-scrollbar{ width:6px; height:0; }
+.history-list::-webkit-scrollbar-track{ background:transparent; }
+.history-list::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.2); border-radius:99px; }
+.history-list::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,.34); }
 .history-list .empty{ font-size:12px; color:var(--txt-faint); padding:4px 2px; }
 .history-item{ display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:11px; cursor:pointer;
-  background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.09); transition:background .2s, transform .15s var(--ease); }
-.history-item:hover{ background:rgba(255,255,255,.15); transform:translateX(2px); }
+  background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.09); transition:background .2s; }
+.history-item:hover{ background:rgba(255,255,255,.16); }
 .history-item.stale{ opacity:.6; }
 .history-item .hi-ico{ font-size:16px; flex:none; }
 .history-item .hi-main{ display:flex; flex-direction:column; min-width:0; flex:1; line-height:1.25; }
